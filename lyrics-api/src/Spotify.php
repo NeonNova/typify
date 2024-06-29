@@ -2,11 +2,6 @@
 
 namespace SpotifyLyricsApi;
 
-/**
- * Class Spotify
- *
- * This class is responsible for interacting with the Spotify API.
- */
 class Spotify
 {
     private $token_url = 'https://open.spotify.com/get_access_token?reason=transport&productType=web_player';
@@ -14,17 +9,14 @@ class Spotify
     private $sp_dc;
     private $cache_file;
 
-    /**
-     * Spotify constructor.
-     *
-     * @param string $sp_dc The Spotify Data Controller (sp_dc) cookie value.
-     */
     function __construct($sp_dc)
     {
         $this->cache_file = sys_get_temp_dir() . '/spotify_token.json';
+        if (!$sp_dc) {
+            throw new SpotifyException('SP_DC is not set. Please check your environment variables.');
+        }
         $this->sp_dc = $sp_dc;
     }
-
     /**
      * Retrieves an access token from the Spotify and stores it in a file.
      * The file is stored in the working directory.

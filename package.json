@@ -12,6 +12,13 @@
     "build:backend": "cd backend && tsc"
   },
   "devDependencies": {
+    "@types/passport": "^1.0.16",
+    "@types/passport-spotify": "^2.0.4",
     "concurrently": "^6.2.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "passport": "^0.7.0",
+    "passport-spotify": "^2.0.0"
   }
 }
