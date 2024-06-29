@@ -1,0 +1,17 @@
+{
+  "name": "typify",
+  "version": "1.0.0",
+  "description": "A MonkeyType-style typing game with Spotify integration",
+  "scripts": {
+    "start": "concurrently \"npm run start:frontend\" \"npm run start:backend\" \"npm run start:lyrics-api\"",
+    "start:frontend": "cd frontend && npm run dev",
+    "start:backend": "cd backend && npm run dev",
+    "start:lyrics-api": "cd lyrics-api && php -S localhost:8000",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && tsc"
+  },
+  "devDependencies": {
+    "concurrently": "^6.2.0"
+  }
+}
