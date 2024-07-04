@@ -1,30 +1,70 @@
-# React + TypeScript + Vite
+# typify - type to music
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A web-based game where users can practice typing lyrics of their favourite songs, synchronized with Spotify playback.
 
-Currently, two official plugins are available:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🌟 Features
 
-## Expanding the ESLint configuration
+- 🔍 Search and select tracks from Spotify
+- 🎶 Real-time synchronization with song playback
+- 📊 Scoring based on correct characters typed
+- 💻 Interactive UI with typing feedback (green for correct, red for incorrect)
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+## 🛠️ Technologies Used
 
-- Configure the top-level `parserOptions` property like this:
+- **Frontend**: React.js, TypeScript
+- **Backend**: Node.js, Express
+- **API**: Spotify Web API
+- **HTTP Requests**: Axios
+- **Audio**: HTML5 Audio API
+- **Styling**: Tailwind CSS
 
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
-```
+## 🚀 Getting Started
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+Follow these steps to run typify locally:
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/your-username/typify.git
+   cd typify
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables:**
+   Create a `.env` file in the root directory with the following:
+   ```
+   REACT_APP_SPOTIFY_CLIENT_ID=your_spotify_client_id
+   REACT_APP_BACKEND_URL=http://localhost:3050  # Update with your backend URL
+   ```
+
+4. **Start the development server:**
+   ```bash
+   npm start
+   ```
+
+5. **Open your browser:**
+   Navigate to `http://localhost:3000` to view the app.
+
+## 🤝 Contributing
+
+We welcome contributions! Please follow these steps:
+
+1. Fork the repository
+2. Create a new branch: `git checkout -b feature/your-feature-name`
+3. Make your changes and commit them: `git commit -m 'Add some feature'`
+4. Push to the branch: `git push origin feature/your-feature-name`
+5. Submit a pull request
+
+For major changes, please open an issue first to discuss what you would like to change.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 💖 Acknowledgements
+
+i love monkeytype and i love music

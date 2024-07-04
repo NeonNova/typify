@@ -1,30 +1,31 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100vh;
+  overflow-x: hidden;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Circular Spotify TxT-Bold', 'Spotify', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
-.card {
-  padding: 2em;
+#root {
+  display: flex;
+  flex-direction: column;
 }
 
 .read-the-docs {
-  color: #4ade80;
+  color: hsl(var(--accent));
 }
 
-/* Remove any conflicting styles */
-.logo, .logo.react {
-  display: none;
-}
-
-/* Add some custom classes for our app */
 .typing-area {
   margin-top: 2em;
   padding: 1em;
-  border: 1px solid #4ade80;
+  border: 1px solid hsl(var(--accent));
   border-radius: 8px;
-  background-color: #111827;
+  background-color: hsl(var(--card));
+  position: relative;
+  min-height: 200px;
 }
 
 .current-line {
@@ -36,14 +37,14 @@
 
 .next-line {
   font-size: 1.5rem;
-  color: #22c55e;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 1rem;
 }
 
 .search-results {
   list-style-type: none;
   padding: 0;
-  background-color: #111827;
+  background-color: hsl(var(--card));
   border-radius: 0.5rem;
 }
 
@@ -51,7 +52,7 @@
   cursor: pointer;
   padding: 0.75rem;
   transition: background-color 0.3s;
-  border-bottom: 1px solid #374151;
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 .search-results li:last-child {
@@ -59,10 +60,138 @@
 }
 
 .search-results li:hover {
-  background-color: #1f2937;
+  background-color: hsl(var(--accent) / 0.1);
 }
 
 .error-message {
-  color: #ef4444;
+  color: hsl(var(--destructive));
   margin-bottom: 1rem;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background-color: hsl(var(--muted));
+  margin-top: 1rem;
+}
+
+.progress {
+  height: 100%;
+  background-color: hsl(var(--accent));
+  transition: width 0.3s ease;
+}
+
+@keyframes blink {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.2em;
+  background-color: hsl(var(--accent));
+  animation: blink 0.7s infinite;
+}
+
+.line-indicator {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 15px solid hsl(var(--accent));
+  margin-right: 10px;
+}
+
+/* Button styles */
+.button {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  font-weight: 700;
+  padding: 0.75rem 1.5rem;
+  border-radius: 2rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.button:hover {
+  background-color: hsl(var(--accent) / 0.8);
+}
+
+/* Input field styles */
+input[type="text"], input[type="search"] {
+  background-color: hsl(var(--input));
+  color: hsl(var(--foreground));
+  border: none;
+  border-radius: 2rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.9rem;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Utility classes */
+.text-accent {
+  color: hsl(var(--accent));
+}
+
+.bg-accent {
+  background-color: hsl(var(--accent));
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+}
+
+:root {
+  --background: 0 0% 7%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 9%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 9%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 142 71% 45%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 33%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 0 0% 13%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 142 71% 45%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 20%;
+  --input: 0 0% 20%;
+  --ring: 142 71% 45%;
+}
+
+@keyframes fade-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.animate-fade-out {
+  animation: fade-out 2s forwards;
 }

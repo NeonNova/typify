@@ -186,4 +186,48 @@ router.get('/recent', isAuthenticated, async (req, res) => {
   }
 });
 
+router.post('/pause', isAuthenticated, async (req, res) => {
+  const user = req.user as User;
+
+  if (!user.accessToken) {
+    return res.status(401).json({ error: 'No access token available' });
+  }
+
+  try {
+    const deviceResponse = await handleTokenRefreshAndRetry(user, () =>
+      axios.get('https://api.spotify.com/v1/me/player/devices', 
+        { headers: getSpotifyHeaders(user.accessToken) }
+      )
+    );
+
+    const devices: SpotifyDevice[] = deviceResponse.data.devices;
+    const activeDevice = devices.find(d => d.is_active);
+
+    if (!activeDevice) {
+      return res.status(404).json({ error: 'No active Spotify device found' });
+    }
+
+    const playerState = await handleTokenRefreshAndRetry(user, () =>
+      axios.get('https://api.spotify.com/v1/me/player', 
+        { headers: getSpotifyHeaders(user.accessToken) }
+      )
+    );
+
+    const isPlaying = playerState.data.is_playing;
+
+    await handleTokenRefreshAndRetry(user, () =>
+      axios.put(`https://api.spotify.com/v1/me/player/${isPlaying ? 'pause' : 'play'}`, 
+        {}, 
+        { headers: getSpotifyHeaders(user.accessToken) }
+      )
+    );
+
+    res.json({ message: isPlaying ? 'Playback paused' : 'Playback resumed' });
+  } catch (error) {
+    console.error('Error toggling playback:', error);
+    res.status(500).json({ error: 'Failed to toggle playback' });
+  }
+});
+
+
 export default router;
