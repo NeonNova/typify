@@ -2,10 +2,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 
-import { Card, CardContent, CardHeader } from "./ui/card";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
-import { AlertCircle, Music, Play, Pause, Search } from 'lucide-react';
+import { AlertCircle, Play, Pause, Search, RefreshCw } from 'lucide-react';
 
 interface Track {
   id: string;
@@ -24,8 +23,6 @@ interface LyricLine {
   endTimeMs: string;
 }
 
-
-
 const Game: React.FC = () => {
   const [token, setToken] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -40,10 +37,10 @@ const Game: React.FC = () => {
   const [gameEnded, setGameEnded] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const location = useLocation();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const gameContainerRef = useRef<HTMLDivElement>(null);
   const [gameStartTime, setGameStartTime] = useState<number | null>(null);
-  const [correctWords, setCorrectWords] = useState<boolean[]>([]);
-  const [lineCompleted, setLineCompleted] = useState<boolean>(false);
+  const [correctChars, setCorrectChars] = useState<boolean[]>([]);
+  const [totalLines, setTotalLines] = useState<number>(0);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -69,6 +66,7 @@ const Game: React.FC = () => {
         if (newLineIndex !== -1 && newLineIndex !== currentLineIndex) {
           setCurrentLineIndex(newLineIndex);
           setTypedText('');
+          setCorrectChars([]);
         }
 
         if (newLineIndex === lyrics.length - 1) {
@@ -82,24 +80,6 @@ const Game: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [isGameActive, gameEnded, currentLineIndex, lyrics, isPaused, gameStartTime]);
-
-  useEffect(() => {
-    // Reset correctWords when moving to a new line
-    setCorrectWords([]);
-    setTypedText('');
-  }, [currentLineIndex]);
-
-  
-  const calculateScore = (lineIndex: number) => {
-    const cleanText = (text: string) => text.replace(/[^a-zA-Z0-9\s]/g, "").toLowerCase();
-    
-    const currentLine = cleanText(lyrics[lineIndex].words);
-    const typedTextClean = cleanText(typedText);
-    
-    const correctChars = typedTextClean.split('').filter((char, index) => char === currentLine[index]);
-    
-    setScore(prevScore => prevScore + correctChars.length);
-  };
 
   const searchTracks = async () => {
     setError(null);
@@ -121,16 +101,6 @@ const Game: React.FC = () => {
       setError("Failed to search tracks. Please try again.");
     }
   };
-
-  const renderTrackInfo = (track: Track) => (
-    <div className="flex items-center space-x-4">
-      <img src={track.album.images[0]?.url} alt="Album cover" className="w-16 h-16 rounded-md" />
-      <div>
-        <strong className="text-lg md:text-xl block">{track.name}</strong>
-        <p className="text-text-secondary text-sm md:text-base">{track.artists.map(artist => artist.name).join(', ')}</p>
-      </div>
-    </div>
-  );
 
   const selectTrack = async (track: Track) => {
     setSelectedTrack(track);
@@ -159,6 +129,8 @@ const Game: React.FC = () => {
       setCurrentLineIndex(0);
       setScore(0);
       setIsPaused(false);
+      setCorrectChars([]);
+      setTotalLines(lyrics.length);
       const currentTime = Date.now();
       setGameStartTime(currentTime);
       try {
@@ -169,10 +141,19 @@ const Game: React.FC = () => {
       } catch (error) {
         setError("Failed to start playback. Please try again.");
       }
-      inputRef.current?.focus();
+      gameContainerRef.current?.focus();
     } else {
       setError("No lyrics available. Please select a track first.");
     }
+  };
+
+
+  const cleanText = (text: string) => {
+    return text
+      .replace(/\([^)]*\)/g, "") // Remove text within parentheses
+      .replace(/[^a-zA-Z0-9\s]/g, "")
+      .toLowerCase()
+      .trim();
   };
 
   const togglePause = async () => {
@@ -187,109 +168,128 @@ const Game: React.FC = () => {
     }
   };
 
-  const cleanText = (text: string) => {
-    return text
-      .replace(/\([^)]*\)/g, "") // Remove text within parentheses
-      .replace(/[^a-zA-Z0-9\s]/g, "")
-      .toLowerCase()
-      .trim();
-  };
-  
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTypedText = e.target.value;
-    setTypedText(newTypedText);
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!isGameActive || gameEnded || isPaused) return;
 
-    if (lineCompleted) {
-      return; // Don't update score if the line is already completed
-    }
+    const currentLine = cleanText(lyrics[currentLineIndex].words);
+    const key = e.key.toLowerCase();
 
-    const currentLine = lyrics[currentLineIndex].words;
-    const cleanedCurrentLine = cleanText(currentLine);
-    const currentLineWords = cleanedCurrentLine.split(' ');
-    const typedWords = newTypedText.split(' ');
-
-    let newScore = 0;
-    let newCorrectWords = [...correctWords];
-
-    typedWords.forEach((typedWord, wordIndex) => {
-      const targetWord = currentLineWords[wordIndex];
-      if (targetWord) {
-        let wordCorrect = true;
-        for (let i = 0; i < Math.max(typedWord.length, targetWord.length); i++) {
-          if (typedWord[i]?.toLowerCase() === targetWord[i]) {
-            newScore += 1;
-          } else {
-            wordCorrect = false;
-            break;
-          }
-        }
-        newCorrectWords[wordIndex] = wordCorrect && typedWord.length === targetWord.length;
+    if (key === 'backspace') {
+      if (typedText.length > 0) {
+        const newTypedText = typedText.slice(0, -1);
+        setTypedText(newTypedText);
+        const newCorrectChars = [...correctChars];
+        newCorrectChars.pop();
+        setCorrectChars(newCorrectChars);
+        setScore(prevScore => Math.max(0, prevScore - 1));
       }
-    });
+    } else if (key.length === 1 && /[a-z0-9\s]/.test(key)) {
+      const newTypedText = typedText + key;
+      setTypedText(newTypedText);
 
-    setScore(prevScore => prevScore + newScore);
-    setCorrectWords(newCorrectWords);
+      const isCorrect = key === currentLine[typedText.length];
+      const newCorrectChars = [...correctChars, isCorrect];
+      setCorrectChars(newCorrectChars);
 
-    // Check if the user has typed the same number of words as the target line
-    if (typedWords.length === currentLineWords.length+2 && typedWords[typedWords.length]+1 !== '') {
-      setLineCompleted(true);
-      // Move to the next line
-      setCurrentLineIndex(prevIndex => prevIndex + 1);
+      if (isCorrect) {
+        setScore(prevScore => prevScore + 1);
+      }
+
+      if (newTypedText.length === currentLine.length) {
+        setCurrentLineIndex(prevIndex => prevIndex + 1);
+        setTypedText('');
+        setCorrectChars([]);
+      }
     }
-  };
+  };;
 
-  useEffect(() => {
-    // Reset correctWords, typedText, and lineCompleted when moving to a new line
-    setCorrectWords([]);
-    setTypedText('');
-    setLineCompleted(false);
-  }, [currentLineIndex]);
   const renderLyrics = () => {
-    const beforeAfterCount = 2;
-    const startLine = Math.max(0, currentLineIndex - beforeAfterCount);
-    const endLine = Math.min(lyrics.length, currentLineIndex + beforeAfterCount + 1);
-  
-    return (
-      <div className="text-2xl font-bold mb-4">
-        {lyrics.slice(startLine, endLine).map((line, index) => {
-          const lineIndex = startLine + index;
-          const isCurrentLine = lineIndex === currentLineIndex;
-          const cleanedText = cleanText(line.words);
-          const lineWords = cleanedText.split(' ');
-          const typedWords = isCurrentLine ? typedText.split(' ') : [];
-  
-          return (
-            <div key={lineIndex} className={`${isCurrentLine ? 'text-white bg-gray-800 p-2 rounded' : 'text-gray-500'} mb-2`}>
-              {isCurrentLine && (
-                <span className="text-green-500 mr-2 inline-block align-middle">▶</span>
-              )}
-              <span className="inline-block">
-                {lineWords.map((word, wordIndex) => (
-                  <span key={wordIndex} className="mr-1">
-                    {word.split('').map((char, charIndex) => {
-                      let color = isCurrentLine ? 'text-white' : 'text-gray-500';
-                      if (isCurrentLine) {
-                        if (correctWords[wordIndex]) {
-                          color = 'text-green-500';
-                        } else if (typedWords[wordIndex]) {
-                          if (charIndex < typedWords[wordIndex].length) {
-                            color = typedWords[wordIndex][charIndex].toLowerCase() === char ? 'text-green-500' : 'text-red-500';
-                          }
-                        }
-                      }
-                      return <span key={charIndex} className={color}>{char}</span>;
-                    })}
-                  </span>
-                ))}
+    const visibleLines = 5;
+    const halfVisibleLines = Math.floor(visibleLines / 2);
+    
+    // Calculate the range of lines to display
+    let startIndex = Math.max(0, currentLineIndex - halfVisibleLines);
+    let endIndex = Math.min(lyrics.length, startIndex + visibleLines);
+    
+    // Adjust startIndex if we're near the end of the lyrics
+    if (endIndex - startIndex < visibleLines) {
+      startIndex = Math.max(0, endIndex - visibleLines);
+    }
+    
+    // Create an array of line elements to render
+    const linesToRender = [];
+    
+    for (let i = 0; i < visibleLines; i++) {
+      const lineIndex = startIndex + i;
+      
+      if (lineIndex < lyrics.length) {
+        const line = lyrics[lineIndex];
+        const cleanedLine = cleanText(line.words);
+        const isCurrentLine = lineIndex === currentLineIndex;
+        const opacity = isCurrentLine ? 1 : 0.5;
+
+        linesToRender.push(
+          <div
+            key={lineIndex}
+            className={`text-3xl font-bold transition-all duration-300 ease-in-out ${
+              isCurrentLine ? 'text-white' : 'text-gray-500'
+            } flex items-center justify-center w-full`}
+            style={{
+              opacity,
+              transform: `translateY(${(i - halfVisibleLines) * 10}px)`,
+              marginBottom: '4px',
+            }}
+          >
+            {isCurrentLine && (
+              <span className="absolute left-0 transform -translate-x-full text-accent animate-pulse mr-2">
+                ▶
               </span>
+            )}
+            <div className="text-center">
+              {cleanedLine.split('').map((char, charIndex) => (
+                <span
+                  key={charIndex}
+                  className={`${
+                    isCurrentLine && charIndex < typedText.length
+                      ? correctChars[charIndex]
+                        ? 'text-green-500'
+                        : 'text-red-500'
+                      : ''
+                  } ${
+                    isCurrentLine && charIndex === typedText.length ? 'border-b-2 border-white' : ''
+                  }`}
+                >
+                  {char}
+                </span>
+              ))}
             </div>
-          );
-        })}
+          </div>
+        );
+      } else {
+        // Render empty lines with animated ellipsis
+        linesToRender.push(
+          <div
+            key={`empty-${i}`}
+            className="text-3xl font-bold text-green-500 flex items-center justify-center w-full h-10"
+            style={{
+              transform: `translateY(${(i - halfVisibleLines) * 10}px)`,
+              marginBottom: '4px',
+            }}
+          >
+            <span className="animate-pulse">...</span>
+          </div>
+        );
+      }
+    }
+    
+    return (
+      <div className="relative h-64 flex flex-col justify-center items-center overflow-hidden">
+        {linesToRender}
       </div>
     );
   };
-
-    return (
+  
+  return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-background text-white p-4 md:p-8 font-spotify">
       <h1 className="text-5xl md:text-7xl font-bold mb-8 md:mb-12 text-accent">typify.</h1>
       {error && (
@@ -299,96 +299,111 @@ const Game: React.FC = () => {
         </div>
       )}
       {token ? (
-        <Card className="w-full max-w-5xl bg-[#181818] border-[#282828] shadow-lg">
-          <CardHeader className="p-6 md:p-8">
-            {isGameActive && selectedTrack ? (
-              renderTrackInfo(selectedTrack)
-            ) : (
-              <h2 className="text-4xl md:text-3xl font-bold text-center text-accent">Choose your song!</h2>
-            )}
-          </CardHeader>
-          <CardContent className="p-6 md:p-8">
-            {!isGameActive && !gameEnded && (
-              <div className="space-y-6 md:space-y-8">
-                  <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search for a track"
-                      className="flex-grow bg-[#282828] text-white border-accent text-lg p-3 md:p-4 rounded-full"
-                    />
-                    <Button onClick={searchTracks} className="bg-accent hover:bg-hover-accent text-black font-bold py-3 px-6 rounded-full text-lg">
-                      <Search className="mr-2 h-5 w-5" /> Search
-                    </Button>
-                  </div>
-                  {searchResults.length > 0 && (
-                    <div className="mt-6 md:mt-8">
-                      <h3 className="text-2xl md:text-3xl font-bold mb-4 text-accent">Search Results</h3>
-                      <ul className="space-y-3 max-h-64 md:max-h-80 overflow-y-auto pr-4 custom-scrollbar">
-                        {searchResults.map((track) => (
-                          <li
-                            key={track.id}
-                            onClick={() => selectTrack(track)}
-                            className="cursor-pointer hover:bg-[#282828] p-3 rounded-md flex items-center space-x-4 transition-colors duration-200"
-                          >
-                            {renderTrackInfo(track)}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {selectedTrack && (
-                    <div className="mt-6 md:mt-8 p-4 md:p-6 bg-[#282828] rounded-md">
-                      <h3 className="text-2xl md:text-3xl font-bold mb-4 text-accent">Selected Track</h3>
-                      {renderTrackInfo(selectedTrack)}
-                      <Button onClick={startGame} className="mt-4 w-full bg-accent hover:bg-hover-accent text-black font-bold py-3 px-6 rounded-full text-lg md:text-xl">
-                        <Play className="mr-3 h-5 w-5 md:h-6 md:w-6" /> Start Game
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-              {isGameActive && !gameEnded && (
-              <div className="space-y-6 md:space-y-8">
-                <div className="text-2xl md:text-3xl font-bold mb-6 md:mb-8 h-48 md:h-56 overflow-y-auto custom-scrollbar">
-                  {renderLyrics()}
-                </div>
+        <div className="w-full max-w-5xl">
+          {!isGameActive && !gameEnded && (
+            <div className="space-y-6 md:space-y-8">
+              <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
                 <input
-                  ref={inputRef}
                   type="text"
-                  value={typedText}
-                  onChange={handleInputChange}
-                  className="w-full bg-[#282828] text-white border-accent text-lg p-3 md:p-4 rounded-full"
-                  autoFocus
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search for a track"
+                  className="flex-grow bg-[#282828] text-white border-accent text-lg p-3 md:p-4 rounded-full"
                 />
-                <div className="flex justify-between items-center">
-                  <div className="text-xl md:text-2xl font-bold">
-                    <div>Score: {score}</div>
-                  </div>
-                  <Button onClick={togglePause} className="bg-accent hover:bg-hover-accent text-black font-bold py-2 px-4 rounded-full text-lg">
-                    {isPaused ? <Play className="h-5 w-5 md:h-6 md:w-6" /> : <Pause className="h-5 w-5 md:h-6 md:w-6" />}
-                  </Button>
-                </div>
-                <Progress value={(currentLineIndex / lyrics.length) * 100} className="w-full h-3 md:h-4" />
-              </div>
-            )}
-            {gameEnded && (
-              <div className="text-center space-y-6 md:space-y-8">
-                <h3 className="text-3xl md:text-4xl font-bold mb-4 text-accent">Game Over!</h3>
-                <p className="text-2xl md:text-3xl">Your final score: {score}</p>
-                <Button onClick={startGame} className="mt-6 md:mt-8 bg-accent hover:bg-hover-accent text-black font-bold py-3 px-6 rounded-full text-lg md:text-xl">
-                  <Play className="mr-3 h-5 w-5 md:h-6 md:w-6" /> Play Again
+                <Button onClick={searchTracks} className="bg-accent hover:bg-hover-accent text-black font-bold py-3 px-6 rounded-full text-lg">
+                  <Search className="mr-2 h-5 w-5" /> Search
                 </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              {searchResults.length > 0 && (
+                <div className="mt-6 md:mt-8">
+                  <h3 className="text-2xl md:text-3xl font-bold mb-4 text-accent">Search Results</h3>
+                  <ul className="space-y-3 max-h-64 md:max-h-80 overflow-y-auto pr-4 custom-scrollbar">
+                    {searchResults.map((track) => (
+                      <li
+                        key={track.id}
+                        onClick={() => selectTrack(track)}
+                        className="cursor-pointer hover:bg-[#282828] p-3 rounded-md flex items-center space-x-4 transition-colors duration-200"
+                      >
+                        <img src={track.album.images[0]?.url} alt="Album cover" className="w-16 h-16 rounded-md" />
+                        <div>
+                          <strong className="text-lg md:text-xl block">{track.name}</strong>
+                          <p className="text-text-secondary text-sm md:text-base">{track.artists.map(artist => artist.name).join(', ')}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {selectedTrack && (
+                <div className="mt-6 md:mt-8 p-4 md:p-6 bg-[#282828] rounded-md">
+                  <h3 className="text-2xl md:text-3xl font-bold mb-4 text-accent">Selected Track</h3>
+                  <div className="flex items-center space-x-4">
+                    <img src={selectedTrack.album.images[0]?.url} alt="Album cover" className="w-16 h-16 rounded-md" />
+                    <div>
+                      <strong className="text-lg md:text-xl block">{selectedTrack.name}</strong>
+                      <p className="text-text-secondary text-sm md:text-base">{selectedTrack.artists.map(artist => artist.name).join(', ')}</p>
+                    </div>
+                  </div>
+                  <Button onClick={startGame} className="mt-4 w-full bg-accent hover:bg-hover-accent text-black font-bold py-3 px-6 rounded-full text-lg md:text-xl">
+                    <Play className="mr-3 h-5 w-5 md:h-6 md:w-6" /> Start Game
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+          {isGameActive && !gameEnded && (
+            <div
+              ref={gameContainerRef}
+              tabIndex={0}
+              onKeyDown={handleKeyPress}
+              className="space-y-6 md:space-y-8 focus:outline-none"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center">
+                  <img src={selectedTrack?.album.images[0]?.url} alt="Album cover" className="w-12 h-12 rounded-md mr-4" />
+                  <div>
+                    <p className="text-lg font-bold">{selectedTrack?.name}</p>
+                    <p className="text-sm text-gray-300">{selectedTrack?.artists.map(artist => artist.name).join(', ')}</p>
+                  </div>
+                </div>
+                <div className="text-xl font-bold">
+                  Score: {score}
+                </div>
+              </div>
+              <Progress value={(currentLineIndex / totalLines) * 100} className="w-full h-3 md:h-4" />
+              <div className="h-64 flex items-center justify-center">
+                {renderLyrics()}
+              </div>
+              <div className="flex justify-between items-center">
+                <p className="text-lg">Line: {currentLineIndex + 1} / {totalLines}</p>
+                <div>
+                  <Button onClick={togglePause} className="bg-accent hover:bg-hover-accent text-black font-bold py-2 px-4 rounded-full text-lg mr-2">
+                    {isPaused ? <Play className="h-5 w-5 md:h-6 md:w-6" /> : <Pause className="h-5 w-5 md:h-6 md:w-6" />}
+                  </Button>
+                  <Button onClick={startGame} className="bg-accent hover:bg-hover-accent text-black font-bold py-2 px-4 rounded-full text-lg">
+                    <RefreshCw className="h-5 w-5 md:h-6 md:w-6" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          {gameEnded && (
+            <div className="text-center space-y-6 md:space-y-8">
+              <h3 className="text-3xl md:text-4xl font-bold mb-4 text-accent">Game Over!</h3>
+              <p className="text-2xl md:text-3xl">Your final score: {score}</p>
+              <p className="text-xl">Accuracy: {((score / (totalLines * 100)) * 100).toFixed(2)}%</p>
+              <Button onClick={startGame} className="mt-6 md:mt-8 bg-accent hover:bg-hover-accent text-black font-bold py-3 px-6 rounded-full text-lg md:text-xl">
+                <Play className="mr-3 h-5 w-5 md:h-6 md:w-6" /> Play Again
+              </Button>
+            </div>
+          )}
+        </div>
       ) : (
         <p className="text-xl md:text-2xl animate-pulse">Waiting for Spotify authentication...</p>
       )}
     </div>
   );
-}
+};
 
 export default Game;
+

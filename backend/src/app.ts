@@ -7,6 +7,10 @@ import passport from 'passport';
 import { Strategy as SpotifyStrategy } from 'passport-spotify';
 import authRoutes from './routes/auth';
 import gameRoutes from './routes/game';
+import cookieParser from 'cookie-parser';
+
+
+
 
 dotenv.config();
 
@@ -20,6 +24,10 @@ app.use(cors({
 app.use(express.json());
 
 app.use('/api', gameRoutes);
+
+app.use(cookieParser());
+
+
 
 // Session middleware
 app.use(
@@ -49,6 +57,8 @@ passport.use(
         }
     )
 );
+
+
 
 // Serialize user to the session
 passport.serializeUser((user, done) => {
