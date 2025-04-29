@@ -41,6 +41,8 @@ const Game: React.FC = () => {
   const [gameStartTime, setGameStartTime] = useState<number | null>(null);
   const [correctChars, setCorrectChars] = useState<boolean[]>([]);
   const [totalLines, setTotalLines] = useState<number>(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const countdownRef = useRef<number | null>(null);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -51,35 +53,77 @@ const Game: React.FC = () => {
   }, [location]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let intervalId: NodeJS.Timeout;
 
-    if (isGameActive && !gameEnded && !isPaused) {
-      interval = setInterval(() => {
+    if (isGameActive && gameStartTime && lyrics.length > 0) {
+      const updateGame = () => {
         const currentTime = Date.now();
-        const elapsedTime = currentTime - (gameStartTime ?? currentTime);
+        const elapsedTime = currentTime - gameStartTime;
 
-        const newLineIndex = lyrics.findIndex((line, index) =>
-          elapsedTime >= parseInt(line.startTimeMs) &&
-          (index === lyrics.length - 1 || elapsedTime < parseInt(lyrics[index + 1].startTimeMs))
-        );
+        // Find the current line based on timing
+        let newLineIndex = currentLineIndex;
+        for (let i = currentLineIndex; i < lyrics.length; i++) {
+          const lineStartTime = parseInt(lyrics[i].startTimeMs);
+          if (elapsedTime >= lineStartTime) {
+            newLineIndex = i;
+          } else {
+            break;
+          }
+        }
 
-        if (newLineIndex !== -1 && newLineIndex !== currentLineIndex) {
+        // Update current line if needed
+        if (newLineIndex !== currentLineIndex) {
           setCurrentLineIndex(newLineIndex);
           setTypedText('');
           setCorrectChars([]);
         }
 
-        if (newLineIndex === lyrics.length - 1) {
+        // Check if game is over
+        if (newLineIndex >= lyrics.length - 1) {
+          setIsGameActive(false);
           setGameEnded(true);
-          clearInterval(interval);
+          clearInterval(intervalId);
         }
-      }, 1000);
+      };
 
-      return () => clearInterval(interval);
+      updateGame(); // Initial update
+      intervalId = setInterval(updateGame, 100); // Update every 100ms
+
+      return () => clearInterval(intervalId);
     }
+  }, [isGameActive, gameStartTime, lyrics, currentLineIndex]);
 
-    return () => clearInterval(interval);
-  }, [isGameActive, gameEnded, currentLineIndex, lyrics, isPaused, gameStartTime]);
+  useEffect(() => {
+    let animationFrameId: number;
+
+    if (isGameActive && gameStartTime && lyrics.length > 0) {
+      const firstLyricStartTime = parseInt(lyrics[0].startTimeMs);
+      
+      const updateCountdown = () => {
+        const currentTime = Date.now();
+        const timeUntilStart = Math.max(0, firstLyricStartTime - (currentTime - gameStartTime));
+        
+        if (timeUntilStart <= 0) {
+          setCountdown(null);
+          countdownRef.current = null;
+        } else {
+          const newCountdown = timeUntilStart / 1000;
+          setCountdown(newCountdown);
+          countdownRef.current = newCountdown;
+          animationFrameId = requestAnimationFrame(updateCountdown);
+        }
+      };
+
+      updateCountdown(); // Initial update
+
+      return () => {
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+      };
+    }
+  }, [isGameActive, gameStartTime, lyrics]);
+
 
   const searchTracks = async () => {
     setError(null);
@@ -149,6 +193,10 @@ const Game: React.FC = () => {
 
 
   const cleanText = (text: string) => {
+    // Check if the text is just a music symbol
+    if (text.trim() === '♪') {
+      return '♪';
+    }
     return text
       .replace(/\([^)]*\)/g, "") // Remove text within parentheses
       .replace(/[^a-zA-Z0-9\s]/g, "")
@@ -169,9 +217,23 @@ const Game: React.FC = () => {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!isGameActive || gameEnded || isPaused) return;
+    if (!isGameActive || gameEnded) return;
+
+    if (isPaused) return;
 
     const currentLine = cleanText(lyrics[currentLineIndex].words);
+    
+    // Skip typing for music symbol lines
+    if (currentLine === '♪') {
+      const nextLineIndex = currentLineIndex + 1;
+      if (nextLineIndex < lyrics.length) {
+        setCurrentLineIndex(nextLineIndex);
+        setTypedText('');
+        setCorrectChars([]);
+      }
+      return;
+    }
+
     const key = e.key.toLowerCase();
 
     if (key === 'backspace') {
@@ -195,28 +257,29 @@ const Game: React.FC = () => {
         setScore(prevScore => prevScore + 1);
       }
 
+      // Move to next line if current line is complete
       if (newTypedText.length === currentLine.length) {
-        setCurrentLineIndex(prevIndex => prevIndex + 1);
-        setTypedText('');
-        setCorrectChars([]);
+        const nextLineIndex = currentLineIndex + 1;
+        if (nextLineIndex < lyrics.length) {
+          setCurrentLineIndex(nextLineIndex);
+          setTypedText('');
+          setCorrectChars([]);
+        }
       }
     }
-  };;
+  };
 
   const renderLyrics = () => {
     const visibleLines = 5;
     const halfVisibleLines = Math.floor(visibleLines / 2);
     
-    // Calculate the range of lines to display
     let startIndex = Math.max(0, currentLineIndex - halfVisibleLines);
     let endIndex = Math.min(lyrics.length, startIndex + visibleLines);
     
-    // Adjust startIndex if we're near the end of the lyrics
     if (endIndex - startIndex < visibleLines) {
       startIndex = Math.max(0, endIndex - visibleLines);
     }
     
-    // Create an array of line elements to render
     const linesToRender = [];
     
     for (let i = 0; i < visibleLines; i++) {
@@ -226,12 +289,14 @@ const Game: React.FC = () => {
         const line = lyrics[lineIndex];
         const cleanedLine = cleanText(line.words);
         const isCurrentLine = lineIndex === currentLineIndex;
-        const opacity = isCurrentLine ? 1 : 0.5;
+        const isPastLine = lineIndex < currentLineIndex;
+        const opacity = isCurrentLine ? 1 : isPastLine ? 0.7 : 0.5;
+        const isMusicSymbol = cleanedLine === '♪';
 
         linesToRender.push(
           <div
             key={lineIndex}
-            className={`text-3xl font-bold transition-all duration-300 ease-in-out ${
+            className={`text-2xl font-bold transition-all duration-300 ease-in-out ${
               isCurrentLine ? 'text-white' : 'text-gray-500'
             } flex items-center justify-center w-full`}
             style={{
@@ -246,31 +311,34 @@ const Game: React.FC = () => {
               </span>
             )}
             <div className="text-center">
-              {cleanedLine.split('').map((char, charIndex) => (
-                <span
-                  key={charIndex}
-                  className={`${
-                    isCurrentLine && charIndex < typedText.length
-                      ? correctChars[charIndex]
-                        ? 'text-green-500'
-                        : 'text-red-500'
-                      : ''
-                  } ${
-                    isCurrentLine && charIndex === typedText.length ? 'border-b-2 border-white' : ''
-                  }`}
-                >
-                  {char}
-                </span>
-              ))}
+              {isMusicSymbol ? (
+                <span className="text-accent text-3xl animate-pulse">♪</span>
+              ) : (
+                cleanedLine.split('').map((char, charIndex) => (
+                  <span
+                    key={charIndex}
+                    className={`${
+                      isCurrentLine && charIndex < typedText.length
+                        ? correctChars[charIndex]
+                          ? 'text-green-500'
+                          : 'text-red-500'
+                        : ''
+                    } ${
+                      isCurrentLine && charIndex === typedText.length ? 'border-b-2 border-white' : ''
+                    }`}
+                  >
+                    {char}
+                  </span>
+                ))
+              )}
             </div>
           </div>
         );
       } else {
-        // Render empty lines with animated ellipsis
         linesToRender.push(
           <div
             key={`empty-${i}`}
-            className="text-3xl font-bold text-green-500 flex items-center justify-center w-full h-10"
+            className="text-2xl font-bold text-gray-500 flex items-center justify-center w-full h-10"
             style={{
               transform: `translateY(${(i - halfVisibleLines) * 10}px)`,
               marginBottom: '4px',
@@ -284,13 +352,64 @@ const Game: React.FC = () => {
     
     return (
       <div className="relative h-64 flex flex-col justify-center items-center overflow-hidden">
-        {linesToRender}
+        {countdownRef.current !== null && countdownRef.current > 1 ? (
+          <div className="text-6xl font-bold text-accent animate-pulse">
+            {countdownRef.current.toFixed(1)}
+          </div>
+        ) : countdownRef.current !== null && countdownRef.current <= 1 ? (
+          <div className="text-4xl font-bold text-accent animate-pulse">
+            Get ready!
+          </div>
+        ) : (
+          linesToRender
+        )}
       </div>
     );
   };
   
+  const resetGame = () => {
+    setIsGameActive(false);
+    setGameEnded(false);
+    setTypedText('');
+    setCurrentLineIndex(0);
+    setScore(0);
+    setIsPaused(false);
+    setCorrectChars([]);
+    setGameStartTime(null);
+    setCountdown(null);
+    countdownRef.current = null;
+  };
+
+  // Add back button component
+  const renderBackButton = () => (
+    <Button
+      onClick={resetGame}
+      className="absolute top-4 left-4 bg-[#282828] hover:bg-[#383838] text-white font-bold py-2 px-4 rounded-full text-sm flex items-center"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-5 w-5 mr-2"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
+        <path
+          fillRule="evenodd"
+          d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+          clipRule="evenodd"
+        />
+      </svg>
+      Back
+    </Button>
+  );
+
+  const renderGameStats = () => (
+    <div className="text-xl font-bold">
+      Score: {score}
+    </div>
+  );
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen w-full bg-background text-white p-4 md:p-8 font-spotify">
+    <div className="flex flex-col items-center justify-center min-h-screen w-full bg-background text-white p-4 md:p-8 font-spotify relative">
       <h1 className="text-5xl md:text-7xl font-bold mb-8 md:mb-12 text-accent">typify.</h1>
       {error && (
         <div className="flex items-center bg-red-900 text-white p-4 rounded-md mb-8 w-full max-w-4xl">
@@ -358,6 +477,7 @@ const Game: React.FC = () => {
               onKeyDown={handleKeyPress}
               className="space-y-6 md:space-y-8 focus:outline-none"
             >
+              {renderBackButton()}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center">
                   <img src={selectedTrack?.album.images[0]?.url} alt="Album cover" className="w-12 h-12 rounded-md mr-4" />
@@ -366,9 +486,7 @@ const Game: React.FC = () => {
                     <p className="text-sm text-gray-300">{selectedTrack?.artists.map(artist => artist.name).join(', ')}</p>
                   </div>
                 </div>
-                <div className="text-xl font-bold">
-                  Score: {score}
-                </div>
+                {renderGameStats()}
               </div>
               <Progress value={(currentLineIndex / totalLines) * 100} className="w-full h-3 md:h-4" />
               <div className="h-64 flex items-center justify-center">
@@ -389,6 +507,7 @@ const Game: React.FC = () => {
           )}
           {gameEnded && (
             <div className="text-center space-y-6 md:space-y-8">
+              {renderBackButton()}
               <h3 className="text-3xl md:text-4xl font-bold mb-4 text-accent">Game Over!</h3>
               <p className="text-2xl md:text-3xl">Your final score: {score}</p>
               <p className="text-xl">Accuracy: {((score / (totalLines * 100)) * 100).toFixed(2)}%</p>
